@@ -1,0 +1,7 @@
+$email="disposisi@hk.co.id" ;
+    <?
+    $email="disposisi@hk.co.id" ;
+    $message = "testing" ;
+   @mail("dedy@hk.co.id", "Pemberitahuan Disposisi", $message, "From: $email")or die("salahhh");
+    print "Congratulations your email has been sent";
+    ?>s

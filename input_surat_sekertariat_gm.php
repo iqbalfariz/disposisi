@@ -1,0 +1,504 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>jQuery UI Autocomplete - Default functionality</title>
+<link rel="stylesheet" href="<?php echo $app;?>/css/jquery-ui.css">
+<script src="<?php echo $app;?>/js/jquery-1.9.1.js"></script>
+<script src="<?php echo $app;?>/js/jquery-ui.js"></script>
+<link rel="stylesheet" href="/resources/demos/style.css">
+<script>
+$(function() {
+	 $.get(app+'/api_check.php', function(data){
+	 	//alert(data);
+	 	var availableTags = [data];
+	 	//alert(availableTags);
+$( "#tags" ).autocomplete({
+source: availableTags
+});
+	 });
+
+});
+</script>
+</head>
+
+
+<?php
+$array = array("DU","DO.I","DK");
+$comma_separated = "'".implode("','", $array)."'";
+
+//cho $comma_separated; // lastname,email,phone
+
+$date=date("Y-m-d H:i:s");
+	if(isset($_POST['save'])){
+		$tglmasuksrt=TanggalIndo($_POST['tgl_masuk']);
+		if(empty($_POST['tgl_surat'])){
+		$tglsurat="NULL";
+		}else{
+		
+		$tglsurat="'".TanggalIndo($_POST['tgl_surat'])."'";
+		}
+		$tglbatassurat=TanggalIndo($_POST['batas']);
+		$tglbatastindak=TanggalIndo($_POST['batas_tindak']);
+		if(!empty($_POST['kd'])&&!empty($_POST['kd'])&&!empty($_POST['kat'])&&!empty($_POST['jenis'])
+			&&!empty($_POST['sifat'])&&!empty($_POST['tgl_masuk'])&&!empty($_POST['perihal'])&&!empty($_POST['ke'])){
+			$sqlcek="select * from tbl_sekertariat_disposisi where no_surat='$_POST[no_surat]' and perihal='$_POST[perihal]' and pengirim_surat='$_POST[pengirim_surat]'";
+			//echo $sqlcek;
+			$ekscek=pg_query($sqlcek) or die(pg_last_error());
+			$ekscek=pg_num_rows($ekscek);
+			if($tglbatastindak>=$tglbatassurat){
+				echo "<script>alert('Batas Tindak Lanjut Tidak Bisa Lebih Dari Batas Waktu Surat');</script>";
+			}else{	
+				if($ekscek < 0){
+					echo "<script>alert('No Surat Sudah Pernah Diinput')</script>";
+				}else{
+					//getdireksi//
+					$kenya=array();
+					$ke=$_POST['ke'];
+					foreach ($_POST['ke'] as $key => $value) {
+				
+						$kenya[] = $ke[$key];
+						$sqldis="insert into tbl_disposisi (id_disposisi,nomor_agenda,tgl_masuk_surat,dari,ke,cc,catatan,status,tgl_kirim)
+									values(nextval('tbl_disposisi_id_disposisi_seq'::regclass),'$_POST[kd]','$tglmasuksrt','Sekertariat','$ke[$key]','','','0','$date')";
+						//echo $sqldis;
+						$eks=pg_query($sqldis)or die(pg_last_error());	
+						//$sqlpa="INSERT into tbl_pa(id,nomor_agenda,atasan,dari,tgl_kirim)values(nextval('tbl_pa_id_seq'::regclass),'$_POST[kd]','$ke[$key]','Sekertariat','$date')";
+							//echo $sqlpa;
+							//$ekspa=pg_query($sqlpa)or die(pg_last_error());
+						//Gateway
+						
+						//cek lantai GM
+						
+						$sqlgm="select * from tbl_jabatan_login where kode_jabatan='$ke[$key]'";
+						$rgm=pg_fetch_array(pg_query($sqlgm));
+						$tglnow=date("Y-m-d");
+						if($rgm['lantai']!=""){
+							$sqlseker="insert into tbl_sekertaris_lantai(id,nomor_agenda,lantai,gm,tgl_kirim) values(nextval('tbl_sekertaris_lantai_id_seq'::regclass),'$_POST[kd]',
+									'$rgm[lantai]','$ke[$key]','$tglnow')";
+							$ekseker=pg_query($sqlseker);
+							//echo $sqlseker;
+						}			
+
+			
+						
+						$sqlceknomer="select * from tbl_jabatan_login where kode_jabatan='$ke[$key]'";
+						//$eksceknomer=pg_query($sqlceknomer)or die(pg_last_error());
+						$rcekno=pg_fetch_array($eksceknomer);
+						require_once('gateway/smsclass.php'); // panggil class  
+						ob_start();
+						$smsusername = 'zikri'; // username 
+						$smspassword = 'zikri';     // password 
+						$apikey      = '8c1223ae45917879d1f49a7c48dfd7f5';
+						//$nohp="082125531718";
+						$nohp=$rcekno['no_telp'];
+						$to_mail=$rcekno['email'];
+						//$nohp  = "08161969144";
+						//$nohp="085782878729";
+						$link="http://disposisi.hutama-karya.com";
+						if($_POST['sifat']=="1"){
+							$sft="Biasa";
+						}elseif($_POST['sifat']=="2"){
+							$sft="SEGERA";
+						}else{
+							$sft="Umum";
+						}
+						$pesan = "Anda   Mendapatkan Disposisi Perihal ".$_POST['perihal']." Dan Bersifat ".$sft." Dari Sekertariat  Dengan Nomor Agenda ".$_POST['kd']." untuk ".$ke[$key]." Buka Link Berikut ".$link;
+						$sms = new smsreguler();
+						$sms->username = $smsusername;
+						$sms->password = $smspassword;
+						$sms->apikey   = $apikey;
+						$sms->setTo($nohp);
+						$sms->setText($pesan);
+						if($nohp!=""){
+						$sts=$sms->smssend();
+						}
+						if($to_mail!=""){
+						$email="disposisi@hk.co.id" ;
+						$to_mail="zikrifahmy@gmail.com";
+						@mail($to_mail,"Pemberitahuan Disposisi",$pesan,"From:$email")or die("Email Bermasalah");
+						}
+
+					}
+					//echo $kenya;
+					$disposisi_ke  = '"'.implode('","',$kenya).'"';
+					//echo $disposisi_ke."tesss";
+					//endgetdireksi//
+					//insert_data//
+					$datetime=date("Y-m-d H:i:s");
+					$ipaddress=$_SERVER['REMOTE_ADDR'];
+
+					$sqlsimpan="INSERT into tbl_sekertariat_disposisi (id,nomor_agenda,sifat,jenis,kategori,tgl_terima,pengirim,tgl_surat,no_surat,perihal,user_add,ip_add,waktu_add,ke,batas_surat,bts_tindak_lanjut,pengirim_surat)
+								values(nextval('tbl_sekertariat_disposisi_id_seq'::regclass),'$_POST[kd]','$_POST[sifat]','$_POST[jenis]','$_POST[kat]','$tglmasuksrt',
+									'$_POST[pengirim]',$tglsurat,'$_POST[no_surat]','$_POST[perihal]','$_SESSION[id]','$ipaddress','$datetime','$disposisi_ke','$tglbatassurat','$tglbatastindak','$_POST[pengirim_surat]')";
+					//echo $sqlsimpan;
+					$ekssimpan=pg_query($sqlsimpan)or die(pg_last_error());
+					echo "<script>alert('Diposisi Terkirim...');</script>";
+					 printf("<script>location.href='$app'</script>");
+					//endinser_data//
+				
+				//upload_file//
+				 $errors= array();
+				 $nomer_agenda=$_POST['kd'];
+				foreach($_FILES['img']['tmp_name'] as $key => $tmp_name ){
+					$file_name =$_FILES['img']['name'][$key];
+					$file_size =$_FILES['img']['size'][$key];
+					$file_tmp =$_FILES['img']['tmp_name'][$key];
+					$file_type=$_FILES['img']['type'][$key];	
+			        		
+			        $query="INSERT into tbl_upload_file (id_upload,nomor_agenda,file_name,file_type,file_size) VALUES(nextval('tbl_upload_file_id_upload_seq'::regclass),'$_POST[kd]','$file_name','$file_type','$file_size'); ";
+//echo $query;
+				    $desired_dir="file/".$nomer_agenda;
+				    $pengirimnya=substr($nomer_agenda,0,3);
+			        $tahunnya=substr($nomer_agenda,4,2);
+			        $bulanya=substr($nomer_agenda,7,2);
+			        $desired_dir1=mkdir('file/'.$pengirimnya,0700);
+			        $desired_dir2=mkdir('file/'.$pengirimnya.'/'.$tahunnya,0700);
+			        $desired_dir3=mkdir('file/'.$pengirimnya.'/'.$tahunnya.'/'.$bulanya,0700);
+			        $desired_dir='file/'.$pengirimnya.'/'.$tahunnya.'/'.$bulanya.'/'.$nomer_agenda;
+			        if(empty($errors)==true){
+			            if(is_dir($desired_dir)==false){
+					chmod($desired_dir1,0777);
+					chmod($desired_dir2,0777);
+					chmod($desired_dir3,0777);					
+					chmod($desired_dir,0777);			                
+					mkdir("$desired_dir", 0700);		// Create directory if it does not exist
+			            }
+			            if(is_dir("$desired_dir/".$file_name)==false){ 
+			            	    move_uploaded_file($file_tmp,"$desired_dir/".$file_name);
+					chmod($desired_dir1,0777);
+					chmod($desired_dir2,0777);
+					chmod($desired_dir3,0777);					
+					chmod($desired_dir."/".$file_name,0777);
+			            }else{									// rename the file if another one exist
+			                $new_dir="$desired_dir/".$file_name.time();
+			                 rename($file_tmp,$new_dir) ;				
+			            }
+					 pg_query($query)or die(pg_last_error());			
+			        }else{
+			                print_r($errors);
+			        }
+				}
+				}	
+			}
+			//endupload_file//
+		}else{
+			echo "<script>alert('Mohon Lengkapi Isian ')</script>";
+		}
+	
+	}
+
+?>
+
+
+ <link rel="stylesheet" href="<?php echo $app;?>/css/jquery-ui.css">
+<script src="<?php echo $app;?>/js/jquery-1.9.1.js"></script>
+<script src="<?php echo $app;?>/js/jquery-ui.js"></script>
+<script type="text/javascript">
+var app='<?php echo $app;?>';
+ $(function() {
+$( "#datepicker1" ).datepicker();
+$( "#batassurat" ).datepicker();
+$( "#tgl" ).datepicker();
+$( "#bts_tindak" ).datepicker();
+
+});
+ function tes(id){
+		//alert(id);
+		var tgl=new Date();
+		var tanggal=tgl.toString('yy-MMdd');  
+		var tgl_surat_masuk=document.getElementById('tgl').value;
+		var hari=tgl_surat_masuk.substr(3,2);
+		var bulan=tgl_surat_masuk.substr(0,2);
+		var tahun=tgl_surat_masuk.substr(8,4);
+		//alert(tgl_surat_masuk);
+		var no_depan=id;
+		var depan=id+"-"+tahun+"-"+bulan+hari;
+		//alert(app);
+			//Internal tampungdata;
+			//int tampungdata;
+			//var dataya=load('http://localhost/aplikasi_surat/api_getkode.php?id='+depan);
+			$.get(app+'/api_getkode.php?id='+depan, function(data){
+				//document.getElementById('kode').load('<img src="http://localhost/aplikasi_surat/img/load.gif">');
+  				//alert("Data: " + data);
+				
+		//var val.load('http://localhost/aplikasi_surat/api_getkode.php?id='+depan);
+		var no=data.replace(/\s/g, "");
+		document.getElementById('kd').value=depan+"-"+no;
+
+		document.getElementById('kode').innerHTML=depan+"-"+data;
+		});
+		
+	}
+function sphide(radiobtn){
+	if(radiobtn.checked){
+		//alert('tes');
+		document.getElementById("DU").style.display="none";
+		document.getElementById("DO.I").style.display="none";
+		document.getElementById("DO.II").style.display="none";
+		document.getElementById("DK").style.display="none";
+		document.getElementById("DSU").style.display="none";
+		document.getElementById("DP").style.display="none";
+			
+	}else{
+		document.getElementById("DU").style.display="inline";
+		document.getElementById("DO.I").style.display="inline";
+		document.getElementById("DO.II").style.display="inline";
+		document.getElementById("DK").style.display="inline";
+		document.getElementById("DSU").style.display="inline";
+		document.getElementById("DP").style.display="inline";
+	}
+}
+
+function spshow(radiobtn){
+	if(radiobtn.checked){
+		document.getElementById("DU").style.display="inherit";
+		document.getElementById("DO.I").style.display="inherit";
+		document.getElementById("DO.II").style.display="inherit";
+		document.getElementById("DK").style.display="inherit";
+		document.getElementById("DSU").style.display="inherit";
+		document.getElementById("DP").style.display="inherit";
+		/*
+		document.getElementById("DU").style.display="inline";
+		document.getElementById("DO.I").style.display="inline";
+		document.getElementById("DO.II").style.display="inline";
+		document.getElementById("DK").style.display="inline";
+		document.getElementById("DSU").style.display="inline";
+		document.getElementById("DP").style.display="inline";	
+		*/
+	}
+
+}
+function kate(val){
+	  $("#pengirim").html('<img src="img/load.gif"> Load...');
+	$("#pengirim").load(app+"/api_combo.php?id="+val)
+
+}
+
+</script>
+<style type="text/css">
+input[type=radio].css-checkbox {
+							display:none;
+						}
+
+						input[type=radio].css-checkbox + label.css-label {
+							padding-left:27px;
+							height:22.5px; 
+							display:inline-block;
+							line-height:22px;
+							background-repeat:no-repeat;
+							background-position: 0 0;
+							font-size:12px;
+							vertical-align:middle;
+							cursor:pointer;
+
+						}
+
+						input[type=radio].css-checkbox:checked + label.css-label {
+							background-position: 0 -22px;
+						}
+						label.css-label {
+				background-image:url(img/csscheckbox_6488f6625f8516801043511b8be871c2.png);
+				-webkit-touch-callout: none;
+				-webkit-user-select: none;
+				-khtml-user-select: none;
+				-moz-user-select: none;
+				-ms-user-select: none;
+				user-select: none;
+			}
+</style>
+<link rel="stylesheet" href="<?php echo $app;?>/css/style.css"/>
+
+<div class="block block-themed">
+
+	<div class="block-title">
+		<div class="block-options">
+			<a href="javascript:void(0)" class="btn btn-option enable-tooltip" data-toggle="block-collapse" title="Toggle block's content"></a>
+			<a href="javascript:void(0)" class="btn btn-option" data-toggle="tooltip" title="Settings"></a>
+		</div>
+	<h4>Surat Masuk</h4>
+	</div>
+		<div class="block-content">
+		<form action="" method="post" class="form-horizontal" enctype="multipart/form-data" >
+			<div class="form-group">
+		<label class="control-label col-md-2" for="textarea-large">Tanggal Masuk Surat</label>
+		<div class="col-md-10">
+		<div id="datetimepicker1" class="input-append date">
+		    <input id="tgl"  class="form-control"type="text" value="<?php echo $_POST['tgl_masuk'];?>" name="tgl_masuk"></input>
+		    <span class="add-on">
+		      <i data-time-icon="icon-time" data-date-icon="icon-calendar">
+		      </i>
+		    </span>
+		  </div>
+		</div>
+		</div>
+
+		<div class="form-group">
+		<label class="control-label col-md-2" for="textarea-large">Kategori</label>
+		<div class="col-md-5">
+			<input type="radio" name="kat" onclick="kate(this.value)" id="eks"  class="css-checkbox" value="1" /><label style="margin:5px;" for="eks" class="css-label">External</label>
+			<input type="radio" name="kat" onclick="kate(this.value)" id="int"  class="css-checkbox" value="2" /><label style="margin:5px;" for="int" class="css-label">Internal</label>
+			
+			<!--
+			<input type="radio" class="input-themed" name="kat" value="1">&nbsp; Eksternal &nbsp;&nbsp;&nbsp; <input type="radio" class="input-themed" value="2" name="kat">&nbsp; Internal
+			-->
+		</div>
+		</div>
+
+		<div class="form-group">
+		<label class="control-label col-md-2" for="textarea-default">Kode Odner</label>
+		<div class="col-md-3">
+			<span id="pengirim" >
+			<select name="pengirim"  onchange="tes(this.value)">
+				<option></option>
+				<?php
+					$sql="select * from tbl_kode_pengirim";
+					$eks=pg_query($sql);
+					while($rs=pg_fetch_array($eks)){
+						echo "<option value='".$rs['kode_pengirim']."'>".$rs['pengirim']."</option>";
+					}
+				?>
+				
+			</select>
+			</span>
+			</br><span><b>Kode</b></span>
+			<span id="kode" style="font-style:italic;"><div id="img"></div></span>
+			<input type="hidden" name="kd" id="kd">
+		</div>
+		</div>
+
+		<div class="form-group">
+		<label class="control-label col-md-2" for="textarea-large">Pengirim</label>
+		<div class="col-md-10">
+		<input type="text" class="form-control" value="<?php echo $_POST['pengirim'];?>"  id="general-input-grid3" name="pengirim_surat">
+		</div>
+		</div>
+
+		<div class="form-group">
+		<label class="control-label col-md-2">Sifat</label>
+		<div class="col-md-4">
+			<input type="radio" name="sifat" onclick="spshow(this)" id="radiob"  class="css-checkbox" value="1" /><label style="margin:5px;" for="radiob" class="css-label">Biasa</label>
+			<input type="radio" name="sifat" onclick="spshow(this)" id="radios" class="css-checkbox" value="2" /><label style="margin:5px;" for="radios" class="css-label">Segera</label>
+			<input type="radio" name="sifat" onclick="sphide(this)" id="radiou" class="css-checkbox" value="3" /><label style="margin:5px;" for="radiou" class="css-label">Umum</label>
+			<!--
+			<input type="radio" id="general-themed-radio1"  class="input-themed" name="sifat" value="1">&nbsp; Biasa &nbsp;&nbsp;&nbsp; <input type="radio" id="general-themed-radio1" value="2" class="input-themed" name="sifat">&nbsp; Segera&nbsp;&nbsp;&nbsp;<input type="radio" id="general-themed-radio1" value="3" onclick="sphide(this)" class="input-themed" name="sifat">&nbsp; Umum
+				-->	
+		</div>
+		</div>
+		<div class="form-group">
+		<label class="control-label col-md-2" for="textarea-medium">Jenis</label>
+		<div class="col-md-5">
+			<input type="radio" name="jenis" id="asli" class="css-checkbox" value="1" /><label style="margin:5px;" for="asli" class="css-label">Asli</label>
+			<input type="radio" name="jenis" id="copy" class="css-checkbox" value="2" /><label style="margin:5px;" for="copy" class="css-label">Copy</label>
+			<input type="radio" name="jenis" id="cc" class="css-checkbox" value="3" /><label style="margin:5px;" for="cc" class="css-label">Tembusan</label>
+					
+			
+			<!--
+		 	<input type="radio" value="2" class="iput-themed" name="jenis">&nbsp; Asli&nbsp;&nbsp;&nbsp; <input type="radio" class="input-themed" value="2" name="jenis">&nbsp; Copy&nbsp;&nbsp;&nbsp; <input type="radio" class="input-themed" value="2" name="jenis">&nbsp; Tembusan
+			-->
+		</div>
+		</div>
+		
+		
+
+		<div class="form-group">
+		<label class="control-label col-md-2" for="textarea-large">Tanggal Surat</label>
+		<div class="col-md-10">
+		<div id="datetimepicker" class="input-append date">
+    <input id="datepicker1"  class="form-control"type="text" value="<?php echo $_POST['tgl_surat'];?>" name="tgl_surat"></input>
+    <span class="add-on">
+      <i data-time-icon="icon-time" data-date-icon="icon-calendar">
+      </i>
+    </span>
+  </div>
+		</div>
+		</div>
+
+
+		<div class="form-group">
+		<label class="control-label col-md-2" for="textarea-large">Batas Waktu Surat</label>
+		<div class="col-md-10">
+		<div id="datetimepicker" class="input-append date">
+    <input id="batassurat"  class="form-control"type="text" value="<?php echo $_POST['batas'];?>" name="batas"></input>
+    <span class="add-on">
+      <i data-time-icon="icon-time" data-date-icon="icon-calendar">
+      </i>
+    </span>
+  </div>
+		</div>
+		</div>
+		<div class="form-group">
+		<label class="control-label col-md-2" for="textarea-large">Batas Tindak Lanjut </label>
+		<div class="col-md-10">
+		<div id="datetimepicker" class="input-append date">
+    <input id="bts_tindak"  class="form-control"type="text" value="<?php echo $_POST['batas'];?>" name="batas_tindak"></input>
+    <span class="add-on">
+      <i data-time-icon="icon-time" data-date-icon="icon-calendar">
+      </i>
+    </span>
+  </div>
+		</div>
+		</div>
+		<div class="form-group">
+
+		<label class="control-label col-md-2" for="textarea-large">No Surat</label>
+		<div class="col-md-10">
+		<input type="text" class="form-control" value="<?php echo $_POST['no_surat'];?>" id="tags" name="no_surat">
+		</div>
+		</div>
+		<div class="form-group">
+		<label class="control-label col-md-2" for="textarea-large">Perihal</label>
+		<div class="col-md-10">
+		<input type="text" class="form-control" value="<?php echo $_POST['perihal'];?>"  id="general-input-grid3" name="perihal">
+		</div>
+		</div>
+		
+		<div class="form-group">
+		<label class="control-label col-md-2" for="textarea-large">Lampiran</label>
+		<div class="col-md-4">
+<input type="file" multiple="" class="form-control" name="img[]" id="file2">
+</div>
+		</div>
+		<div class="form-group">
+		<label class="control-label col-md-2">Distribusi Ke</label>
+		<div class="col-md-3">
+		<div>
+		<?php 
+			$sqldisposisi="select * from tbl_jabatan_login where kode_jabatan like 'GM%' and unit_kerja='KP' or kode_jabatan='SPI' or kode_jabatan='SP'
+			 or kode_jabatan='GMDJJ' or kode_jabatan='GMEPC' order by lantai desc";
+			$eksdisposisi=pg_query($sqldisposisi)or die($sqldisposisi);
+			while($rd=pg_fetch_array($eksdisposisi)){
+				echo "<label class='' id='".$rd['kode_jabatan']."'>
+					<div class='icheckbox_square-grey' style='position: relative;'><input type='checkbox' value='".$rd['kode_jabatan']."' class='input-themed' name='ke[]' id='general-themed-checkbox2' style='position: absolute; opacity: 0;'><ins class='iCheck-helper' style='position: absolute; top: 0%; left: 0%; display: block; width: 100%; height: 100%; margin: 0px; padding: 0px; background: none repeat scroll 0% 0% rgb(255, 255, 255); border: 0px none; opacity: 0;'></ins></div>&nbsp;&nbsp;".$rd['kode_jabatan']."
+					</label>
+					</div>
+					<div>";
+			}
+			/*$sqldisposisi1="select * from tbl_jabatan_login where kode_jabatan like 'GM%' and kode_jabatan !='GMEPC'";
+			$eksdisposisi1=pg_query($sqldisposisi1)or die($sqldisposisi);
+			while($rd1=pg_fetch_array($eksdisposisi1)){
+				echo "<label>
+					<div class='icheckbox_square-grey' style='position: relative;'><input type='checkbox' value='".$rd1['kode_jabatan']."' class='input-themed' name='ke[]' id='general-themed-checkbox2' style='position: absolute; opacity: 0;'><ins class='iCheck-helper' style='position: absolute; top: 0%; left: 0%; display: block; width: 100%; height: 100%; margin: 0px; padding: 0px; background: none repeat scroll 0% 0% rgb(255, 255, 255); border: 0px none; opacity: 0;'></ins></div>&nbsp;&nbsp;".$rd1['kode_jabatan']."
+					</label>
+					</div>
+					<div>";
+			}*/
+
+		?>
+		
+	
+		</div>
+		</div>
+		</div>
+		
+		<div class="form-group form-actions">
+		<div class="col-md-10 col-md-offset-2">
+		<button type="reset" class="btn btn-danger" value="teset"> Reset</button>
+		<input type="submit" class="btn btn-success" name="save" value="save"></button>
+		</div>
+		</div>
+		
+		</form>
+	</div>
+</div>
+

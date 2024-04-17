@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+</head>
+
+
+<?php
+
+$date=date("Y-m-d H:i:s");
+	if(isset($_POST['save'])){
+		if(!empty($_POST['PL'])&&!empty($_POST['PB'])){
+			$sqlcekpwd="select pwd from tbl_jabatan_login where kode_jabatan='$_SESSION[uname]' ";
+			$ekcekpwd=pg_query($sqlcekpwd);
+			$rcekpwd=pg_fetch_array($ekcekpwd);
+			$plama=md5($_POST['PL']);
+			$pbaru=md5($_POST['PB']);
+
+			if($rcekpwd['pwd']==$plama){
+				$sqlupwd="update tbl_jabatan_login set pwd='$pbaru' where kode_jabatan='$_SESSION[uname]'";
+				pg_query($sqlupwd);
+				echo "<script>alert('Password Dirubah')</script>";
+			}else{
+				echo "<script>alert('Password Lama Tidak Cocok')</script>";
+			}
+		}else{
+			echo "<script>alert('Lengkapi Data')</script>";
+		}
+	}
+
+?>
+
+
+ 
+
+<div class="block block-themed">
+
+	<div class="block-title">
+		<div class="block-options">
+			<a href="javascript:void(0)" class="btn btn-option enable-tooltip" data-toggle="block-collapse" title="Toggle block's content"><i class="icon-arrow-up"></i></a>
+			<a href="javascript:void(0)" class="btn btn-option" data-toggle="tooltip" title="Settings"><i class="icon-cog"></i></a>
+		</div>
+	<h4>Ganti Password</h4>
+	</div>
+		<div class="block-content">
+		<form action="" method="post" class="form-horizontal" enctype="multipart/form-data" >
+	
+		
+		<div class="form-group">
+
+		<label class="control-label col-md-2" for="textarea-large">Password Lama</label>
+		<div class="col-md-10">
+		<input type="password" class="form-control" value="<?php echo $_POST['no_surat'];?>" id="tags" name="PL">
+		</div>
+		</div>
+		<div class="form-group">
+		<label class="control-label col-md-2" for="textarea-large">Password Baru</label>
+		<div class="col-md-10">
+		<input type="password" class="form-control" value="<?php echo $_POST['perihal'];?>"  id="general-input-grid3" name="PB">
+		</div>
+		</div>
+	
+		if($_SESSION['uname']!="admin"){
+			<div class="form-group">
+            	    	<label class="control-label col-md-2" for="textarea-large">No Handphone</label>
+               		 <div class="col-md-10">
+                		<input type="password" class="form-control" value="<?php echo $_POST['perihal'];?>"  id="general-input-grid3" name="PB">
+                	 </div>
+                	</div>
+			
+			<div class="form-group">
+	                <label class="control-label col-md-2" for="textarea-large">Email</label>
+        	        <div class="col-md-10">
+               			 <input type="password" class="form-control" value="<?php echo $_POST['perihal'];?>"  id="general-input-grid3" name="PB">
+                	</div>
+                	</div>
+
+
+		}
+		
+		
+		<div class="form-group form-actions">
+		<div class="col-md-10 col-md-offset-2">
+		<button type="reset" class="btn btn-danger" value="teset"> Reset</button>
+		<input type="submit" class="btn btn-success" name="save" value="save"></button>
+		</div>
+		</div>
+		
+		</form>
+	</div>
+</div>
+
